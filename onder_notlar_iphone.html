@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171923">
+<title>Önder Notlar</title>
+<style>
+:root{color-scheme:dark;--bg:#101116;--card:#1b1d27;--muted:#a7a9b7;--line:#303341;--accent:#9b8cff;--green:#73d6a1}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f6f6fb;font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{padding:24px 18px 16px;background:linear-gradient(135deg,#272342,#171923);position:sticky;top:0;z-index:2}
+h1{font-size:27px;margin:0 0 5px}header p{margin:0;color:var(--muted);font-size:14px}
+main{padding:16px;max-width:680px;margin:auto}.panel,.task{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:14px}
+label{display:block;color:#d7d7e4;font-size:13px;margin:12px 0 6px}
+input,textarea{width:100%;border:1px solid var(--line);background:#11131a;color:white;border-radius:10px;padding:12px;font:inherit}
+textarea{min-height:90px;resize:vertical}
+button{border:0;border-radius:11px;padding:12px 15px;font:600 15px inherit;cursor:pointer}
+.primary{background:var(--accent);color:#171326;width:100%;margin-top:12px}
+.secondary{background:#2a2c39;color:white}.delete{background:#40272d;color:#ffb9c2}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.task-title{font-weight:650;overflow-wrap:anywhere}.task-meta{font-size:13px;color:var(--muted);margin-top:7px;white-space:pre-wrap;overflow-wrap:anywhere}
+.task.done{opacity:.62}.task.done .task-title{text-decoration:line-through}.task-top{display:flex;gap:10px;align-items:flex-start}.task-top input{width:20px;height:20px;margin-top:2px;accent-color:var(--green)}.task-content{flex:1;min-width:0}
+.section-title{font-size:17px;margin:22px 2px 10px}.empty{color:var(--muted);text-align:center;padding:20px 8px}
+.small{font-size:12px;color:var(--muted);line-height:1.5}.badge{display:inline-block;color:#d2caff;background:#332d50;border-radius:99px;padding:4px 8px;font-size:11px;margin-bottom:9px}
+</style>
+</head>
+<body>
+<header><h1>Önder Notlar</h1><p>Notlarını yaz, görevlerini takip et.</p></header>
+<main>
+<section class="panel">
+<div class="badge">YENİ NOT / GÖREV</div>
+<label for="title">Başlık</label><input id="title" maxlength="120" placeholder="Örn. Matematik ödevi">
+<label for="details">Not</label><textarea id="details" placeholder="Detayları buraya yaz..."></textarea>
+<label for="when">Tarih ve saat (isteğe bağlı)</label><input id="when" type="datetime-local">
+<button class="primary" id="save">Kaydet</button>
+<p class="small">Verilerin bu tarayıcıda saklanır. Bu ilk sürümde otomatik alarm gönderilmez; tarih ve saati görevde gösterir.</p>
+</section>
+<div class="row">
+<button class="secondary" id="allBtn">Tüm görevler</button><button class="secondary" id="openBtn">Tamamlanmamışlar</button><button class="secondary" id="doneBtn">Tamamlananlar</button>
+</div>
+<h2 class="section-title" id="listTitle">Görevlerin</h2>
+<div id="list"></div>
+<p class="small">İpucu: iPhone'da Safari ile açıp Paylaş → Ana Ekrana Ekle seçeneğiyle ana ekrana kısayol ekleyebilirsin. Gerçek zamanlı bildirimler için uygulamanın HTTPS üzerinden yayınlanması ve iOS web bildirim desteğinin ayrıca kurulması gerekir.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let items=[];let filter='all';let editing=null;
+try{items=JSON.parse(localStorage.getItem('onder-notlar-items')||'[]')}catch(e){items=[]}
+function persist(){localStorage.setItem('onder-notlar-items',JSON.stringify(items));render()}
+function fmt(s){if(!s)return 'Tarih belirlenmedi';const d=new Date(s);return isNaN(d)?s:d.toLocaleString('tr-TR',{dateStyle:'medium',timeStyle:'short'})}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function reset(){editing=null;$('title').value='';$('details').value='';$('when').value='';$('save').textContent='Kaydet'}
+$('save').addEventListener('click',()=>{
+ const title=$('title').value.trim(),details=$('details').value.trim(),when=$('when').value;
+ if(!title){$('title').focus();alert('Lütfen bir başlık yaz.');return}
+ if(editing){const x=items.find(i=>i.id===editing);if(x)Object.assign(x,{title,details,when})}
+ else items.unshift({id:Date.now().toString()+Math.random().toString(16).slice(2),title,details,when,done:false,created:Date.now()});
+ persist();reset()
+});
+function render(){
+ const filtered=items.filter(i=>filter==='all'||(filter==='open'?!i.done:i.done));
+ $('listTitle').textContent=filter==='all'?'Görevlerin':filter==='open'?'Tamamlanmamışlar':'Tamamlananlar';
+ if(!filtered.length){$('list').innerHTML='<div class="panel empty">Burada henüz bir şey yok.</div>';return}
+ $('list').innerHTML=filtered.map(i=>`<article class="task ${i.done?'done':''}"><div class="task-top"><input type="checkbox" aria-label="Tamamlandı" ${i.done?'checked':''} data-done="${i.id}"><div class="task-content"><div class="task-title">${escapeHtml(i.title)}</div><div class="task-meta">${escapeHtml(i.details||'Not eklenmedi')}<br>🗓 ${escapeHtml(fmt(i.when))}</div></div></div><div class="row" style="margin-top:12px"><button class="secondary" data-edit="${i.id}">Düzenle</button><button class="delete" data-del="${i.id}">Sil</button></div></article>`).join('');
+ $('list').querySelectorAll('[data-done]').forEach(el=>el.addEventListener('change',()=>{const x=items.find(i=>i.id===el.dataset.done);if(x)x.done=el.checked;persist()}));
+ $('list').querySelectorAll('[data-del]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Bu görevi silmek istiyor musun?')){items=items.filter(i=>i.id!==el.dataset.del);persist()}}));
+ $('list').querySelectorAll('[data-edit]').forEach(el=>el.addEventListener('click',()=>{const x=items.find(i=>i.id===el.dataset.edit);if(!x)return;editing=x.id;$('title').value=x.title;$('details').value=x.details;$('when').value=x.when;$('save').textContent='Değişiklikleri kaydet';window.scrollTo({top:0,behavior:'smooth'})}));
+}
+$('allBtn').onclick=()=>{filter='all';render()};$('openBtn').onclick=()=>{filter='open';render()};$('doneBtn').onclick=()=>{filter='done';render()};
+render();
+</script>
+</body></html>
